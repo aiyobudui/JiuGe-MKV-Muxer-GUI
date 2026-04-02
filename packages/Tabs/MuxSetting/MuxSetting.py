@@ -1477,4 +1477,16 @@ class VideoPreviewDialog(QDialog):
         
         help_dialog.setLayout(layout)
         help_dialog.exec()
+    
+    def accept(self):
+        # 点击确定时停止视频播放
+        if hasattr(self, 'player'):
+            self.player.stop()
+        super().accept()
+    
+    def reject(self):
+        # 点击取消时停止视频播放
+        if hasattr(self, 'player'):
+            self.player.stop()
+        super().reject()
 
