@@ -32,7 +32,7 @@ class AboutDialog(QDialog):
             title_layout.addWidget(icon_label)
             title_layout.addSpacing(15)
         
-        title_label = QLabel("九歌 MKV 批量混流工具")
+        title_label = QLabel("九歌批量MKV混流工具")
         title_layout.addWidget(title_label)
         title_layout.addStretch()
         

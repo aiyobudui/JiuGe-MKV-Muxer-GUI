@@ -18,7 +18,7 @@ class MainWindow(MyMainWindow):
     def __init__(self, args=None, parent=None):
         super().__init__(args=args, parent=parent)
         self.resize(1160, 635)
-        self.setWindowTitle("九歌 MKV批量混流工具 v1.4.1")
+        self.setWindowTitle("九歌批量MKV混流工具 v1.4.1")
         self.setWindowIcon(GlobalIcons.AppIcon.get())
         
         Options.load()

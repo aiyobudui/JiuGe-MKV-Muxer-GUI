@@ -1,4 +1,4 @@
-# 九歌 MKV批量混流工具 (JiuGe MKV Muxer GUI)
+# 九歌批量MKV混流工具 (JiuGe MKV Muxer GUI)
 
 ![封面](1.png)
 

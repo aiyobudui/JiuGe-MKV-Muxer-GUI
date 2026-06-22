@@ -1088,7 +1088,7 @@ class MuxSettingTab(QWidget):
         
         try:
             with open(log_path, 'w', encoding='utf-8') as f:
-                f.write(f"=== 九歌 MKV 混流日志 ===\n")
+                f.write(f"=== 九歌批量MKV混流日志 ===\n")
                 f.write(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write(f"视频: {video_name}\n")
                 f.write(f"状态: {'成功' if success else '失败'}\n")
