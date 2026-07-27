@@ -11,6 +11,8 @@ cd /d "%~dp0"
 
 echo [Step 1/8] Closing running program...
 taskkill /f /im "JiuGe MKV Muxer GUI.exe" >nul 2>&1
+REM 同时清理可能仍在后台运行的 mkvmerge 子进程（主程序被强杀后子进程会变成孤儿进程继续写盘/占文件锁）
+taskkill /f /im mkvmerge.exe >nul 2>&1
 echo     Done!
 
 echo.

@@ -1,5 +1,16 @@
 # 更新说明
 
+## v1.4.2
+
+### 修复问题
+
+- 修复混流子进程 stdout/stderr 顺序读取导致的死锁（改用独立线程并发排空 stderr，避免大量 warning 时管道写满卡死批次）
+- 修复轨道信息未加载完就开始混流导致轨道选择/默认轨/语言被静默丢弃（新增 VIDEO_TRACK_INFO_READY 守卫，开始混流前等待解析完成）
+- 修复视频切割把同一时间段套用到所有视频、不校验时长的问题（按各视频实际时长截断/丢弃超界保留段）
+- 修复输出目录与源目录相同时仅加 `_1` 后缀、未检测已存在文件导致的覆盖/报错（改为递增 `_2/_3...` 直到不冲突）
+- 修复视频格式提示文案与真实支持列表不一致（改为从 PreDefined.VIDEO_EXTENSIONS 动态生成）
+- 清理未使用的死代码（VideoCutDialog、VideoPreviewDialog.get_keep_times、Widgets.MediaInfoDialog）
+
 ## v1.4.1
 
 ### 修复问题

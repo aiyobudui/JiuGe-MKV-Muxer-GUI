@@ -5,6 +5,7 @@ import zlib
 import subprocess
 import threading
 import logging
+import time
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from PySide6.QtCore import Signal, Qt, QUrl, QEvent, QSize
@@ -531,6 +532,18 @@ class MuxSettingTab(QWidget):
             QMessageBox.warning(self, "警告", "请先设置输出目录")
             return
         
+        # 等待视频轨道信息解析完成，避免轨道选择/默认轨/语言被静默丢弃
+        if not GlobalSetting.VIDEO_TRACK_INFO_READY:
+            from PySide6.QtWidgets import QApplication
+            waited = 0
+            while not GlobalSetting.VIDEO_TRACK_INFO_READY and waited < 8000:
+                QApplication.processEvents()
+                time.sleep(0.1)
+                waited += 100
+            if not GlobalSetting.VIDEO_TRACK_INFO_READY:
+                QMessageBox.warning(self, "警告", "视频轨道信息仍在解析中，请稍候再点击开始混流")
+                return
+        
         self.set_button_state(is_muxing=True)
         GlobalSetting.MUXING_ON = True
         self.stop_requested = False
@@ -650,7 +663,18 @@ class MuxSettingTab(QWidget):
             )
             
             # 实时读取输出并解析进度
+            # 注意：必须并发排空 stderr，否则当 mkvmerge 输出大量 warning 时，
+            # stderr 管道写满会阻塞子进程，导致 stdout 读取死锁、整个批次卡死。
             last_progress = 0
+
+            def _drain_stderr():
+                nonlocal stderr_text
+                if process.stderr:
+                    stderr_text = process.stderr.read()
+
+            stderr_thread = threading.Thread(target=_drain_stderr, daemon=True)
+            stderr_thread.start()
+
             if process.stdout:
                 for line in process.stdout:
                     stdout_text += line
@@ -659,11 +683,8 @@ class MuxSettingTab(QWidget):
                     if progress is not None and progress != last_progress:
                         last_progress = progress
                         self.update_task_progress_signal.emit(task_index, progress)
-            
-            # 读取剩余的错误输出
-            if process.stderr:
-                stderr_text = process.stderr.read()
-            
+
+            stderr_thread.join()
             # 等待进程结束
             return_code = process.wait()
             success = return_code in [0, 1]
@@ -812,8 +833,14 @@ class MuxSettingTab(QWidget):
             # 检查输出目录是否与输入目录相同
             input_dir = os.path.dirname(video_path)
             if os.path.abspath(output_dir) == os.path.abspath(input_dir):
-                # 添加后缀避免冲突
-                video_name += "_1"
+                # 输出目录与输入目录相同，自动递增后缀避免覆盖已存在文件
+                base_name = video_name
+                candidate = os.path.join(output_dir, f"{base_name}_1.{output_format}")
+                suffix = 1
+                while os.path.exists(candidate):
+                    suffix += 1
+                    candidate = os.path.join(output_dir, f"{base_name}_{suffix}.{output_format}")
+                return candidate
             
             return os.path.join(output_dir, video_name + "." + output_format)
         else:
@@ -847,7 +874,9 @@ class MuxSettingTab(QWidget):
             else:
                 keep_times = data if isinstance(data, str) else ""  # 兼容旧格式
             if keep_times:
-                # 直接使用用户选择的输出路径
+                # 按本视频实际时长校验/截断，避免短视频因切割点超出时长而报错失败
+                keep_times = self._clamp_cut_times_to_duration(video_path, keep_times)
+            if keep_times:
                 # mkvmerge --split parts: 不会写入基础文件名，只产生 name-001.ext 等分片
                 split_final_output = output_path
                 args.extend(['--split', f'parts:{keep_times}'])
@@ -870,6 +899,11 @@ class MuxSettingTab(QWidget):
         # 获取轨道信息
         video_subs_info = GlobalSetting.VIDEO_OLD_TRACKS_SUBTITLES_INFO[video_index] if video_index < len(GlobalSetting.VIDEO_OLD_TRACKS_SUBTITLES_INFO) else []
         video_audios_info = GlobalSetting.VIDEO_OLD_TRACKS_AUDIOS_INFO[video_index] if video_index < len(GlobalSetting.VIDEO_OLD_TRACKS_AUDIOS_INFO) else []
+        # 解析未完成/失败的分片可能为 None，统一兜底为空列表，避免 enumerate(None) 崩溃
+        if video_subs_info is None:
+            video_subs_info = []
+        if video_audios_info is None:
+            video_audios_info = []
         
         # 获取轨道选择设置
         selected_audio = self.get_selected_audio_tracks()
@@ -953,6 +987,8 @@ class MuxSettingTab(QWidget):
         
         # 处理视频轨道名称（用户设置的值，空字符串=清空，未设置=不改变）
         video_tracks_info_for_name = GlobalSetting.VIDEO_OLD_TRACKS_VIDEOS_INFO[video_index] if video_index < len(GlobalSetting.VIDEO_OLD_TRACKS_VIDEOS_INFO) else []
+        if video_tracks_info_for_name is None:
+            video_tracks_info_for_name = []
         if video_track_names:
             for track_idx, track_name in video_track_names.items():
                 if isinstance(track_idx, int) and track_idx < len(video_tracks_info_for_name):
@@ -1022,6 +1058,75 @@ class MuxSettingTab(QWidget):
                 args.append(audio_path)
         
         return args, split_final_output
+
+    def _clamp_cut_times_to_duration(self, video_path, keep_times):
+        """将切割保留段时间点按视频实际时长截断，避免短视频因切割点超界而失败。
+
+        仅做安全截断：超出时长的段被裁剪或丢弃；无法获取时长时降级为原样返回。
+        """
+        try:
+            from packages.Utils.TrackInfo import get_video_duration_seconds
+            duration = get_video_duration_seconds(video_path)
+        except Exception:
+            duration = None
+        if duration is None or duration <= 0:
+            return keep_times  # 降级：不截断
+
+        segments = []
+        for seg in keep_times.split(','):
+            seg = seg.strip()
+            if '-' not in seg:
+                continue
+            start_s, end_s = seg.split('-', 1)
+            start_s = start_s.strip()
+            end_s = end_s.strip()
+            start = self._hms_to_seconds(start_s)
+            if start is None:
+                continue
+            if start >= duration:
+                continue  # 整段都在视频之外
+            if end_s == '':
+                end = duration  # 开放式 "start-" 表示到结尾
+            else:
+                end = self._hms_to_seconds(end_s)
+                if end is None:
+                    continue
+            if end > duration:
+                end = duration
+            if end <= start:
+                continue
+            segments.append(f"{self._seconds_to_hms(start)}-{self._seconds_to_hms(end)}")
+        return ','.join(segments)
+
+    @staticmethod
+    def _hms_to_seconds(time_str):
+        """解析 HH:MM:SS / HH:MM:SS.fff / MM:SS / SS.fff 为秒（float）。失败返回 None。"""
+        try:
+            parts = [float(p) for p in time_str.split(':')]
+        except (ValueError, TypeError):
+            return None
+        if len(parts) == 3:
+            h, m, s = parts
+        elif len(parts) == 2:
+            h, m, s = 0, parts[0], parts[1]
+        elif len(parts) == 1:
+            h, m, s = 0, 0, parts[0]
+        else:
+            return None
+        if h < 0 or m < 0 or s < 0 or m >= 60 or s >= 60:
+            return None
+        return h * 3600 + m * 60 + s
+
+    @staticmethod
+    def _seconds_to_hms(seconds):
+        """秒（float）格式化为 HH:MM:SS.fff（mkvmerge --split parts: 接受）。"""
+        total_ms = int(round(max(0.0, float(seconds)) * 1000))
+        h = total_ms // 3_600_000
+        m = (total_ms % 3_600_000) // 60_000
+        s = (total_ms % 60_000) // 1000
+        ms = total_ms % 1000
+        return f"{h:02d}:{m:02d}:{s:02d}.{ms:03d}"
+
     def get_attachment_mime_type(self, ext):
         mime_types = {
             '.jpg': 'image/jpeg',
@@ -1105,87 +1210,6 @@ class MuxSettingTab(QWidget):
     
     def set_preset_options(self):
         self.update_track_menus()
-
-
-class VideoCutDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("视频切割设置")
-        self.setMinimumWidth(500)
-        self.setMinimumHeight(300)
-        self.cut_times = ""
-        self.setup_ui()
-    
-    def setup_ui(self):
-        main_layout = QVBoxLayout()
-        
-        # 说明文本
-        info_label = QLabel("使用说明：")
-        info_text = QLabel("超重要格式规则（必须遵守）：\n"
-                          "1. 时间格式必须是：HH:MM:SS\n"
-                          "2. 不能写 05:00，必须写 00:05:00\n"
-                          "3. 开始和结束用英文减号 -\n"
-                          "4. 多段用英文逗号 ,\n"
-                          "5. 不能有空格\n"
-                          "6. 不能有中文符号\n\n"
-                          "例 1（单段）：00:05:00-00:15:00\n"
-                          "例 2（多段）：00:05:00-00:15:00,00:25:00-00:35:00\n\n"
-                          "批量视频切割说明：\n"
-                          "- 设置的切割时间会应用到所有添加到队列的视频文件\n"
-                          "- 所有视频都会按照相同的时间点进行切割\n"
-                          "- 建议确保所有视频的长度都大于设置的切割时间范围\n\n"
-                          "结果：只输出你写的时间段内容，其余全部切掉")
-        info_text.setWordWrap(True)
-        
-        # 时间输入
-        input_label = QLabel("切割时间：")
-        self.time_edit = QTextEdit()
-        self.time_edit.setPlaceholderText("请输入切割时间，例如：00:05:00-00:15:00")
-        
-        # 按钮布局
-        button_layout = QHBoxLayout()
-        self.ok_button = QPushButton("确定")
-        self.cancel_button = QPushButton("取消")
-        button_layout.addStretch()
-        button_layout.addWidget(self.ok_button)
-        button_layout.addWidget(self.cancel_button)
-        
-        # 添加到主布局
-        main_layout.addWidget(info_label)
-        main_layout.addWidget(info_text)
-        main_layout.addWidget(input_label)
-        main_layout.addWidget(self.time_edit)
-        main_layout.addLayout(button_layout)
-        
-        self.setLayout(main_layout)
-        
-        # 连接信号
-        self.ok_button.clicked.connect(self.accept)
-        self.cancel_button.clicked.connect(self.reject)
-    
-    def accept(self):
-        self.cut_times = self.time_edit.toPlainText().strip()
-        if self.cut_times:
-            # 简单验证时间格式
-            if self.validate_time_format(self.cut_times):
-                super().accept()
-            else:
-                QMessageBox.warning(self, "警告", "时间格式不正确，请按照示例格式输入")
-        else:
-            super().accept()
-    
-    def validate_time_format(self, time_str):
-        import re
-        # 严格的时间格式正则：HH:MM:SS-HH:MM:SS，确保没有空格和中文符号
-        time_pattern = r'^\d{2}:\d{2}:\d{2}-\d{2}:\d{2}:\d{2}(,\d{2}:\d{2}:\d{2}-\d{2}:\d{2}:\d{2})*$'
-        # 检查是否包含空格或中文符号
-        if ' ' in time_str or re.search('[\u4e00-\u9fa5]', time_str):
-            return False
-        return bool(re.match(time_pattern, time_str))
-    
-    def get_cut_times(self):
-        return self.cut_times
-
 
 
 class VideoPreviewDialog(QDialog):
@@ -1843,71 +1867,6 @@ class VideoPreviewDialog(QDialog):
         # 如果切割段列表为空，直接返回空字符串，不进行视频切割
         return ""
     
-    def get_keep_times(self):
-        """【已废弃】计算反向保留段。
-        
-        当前主流程已改为用户选中的时间段直接作为保留段（不再取补集）。
-        此方法保留供参考：传入 cut_segments（要删除的片段），返回反向保留段。
-        
-        mkvmerge --split parts: 语义是保留指定片段，所以传入 cut_segments 时需取反。
-        例如：cut=[00:01:00-00:02:00, 00:04:00-00:05:00], duration=10:00
-        → keep=[00:00:00-00:01:00, 00:02:00-00:04:00, 00:05:00-00:10:00]
-        """
-        if not self.cut_segments:
-            return ""
-        
-        # 获取视频总时长（毫秒）
-        try:
-            duration_ms = self.player.duration()
-            if duration_ms <= 0:
-                return self.get_cut_times()  # 无法获取时长，降级使用切割段
-        except Exception:
-            return self.get_cut_times()  # 播放器不可用，降级使用切割段
-        
-        # 解析切割段为毫秒值
-        cut_ranges = []
-        for start_str, end_str in self.cut_segments:
-            start_ms = self.time_to_ms(start_str)
-            end_ms = self.time_to_ms(end_str)
-            if end_ms > start_ms:
-                cut_ranges.append((start_ms, end_ms))
-        
-        if not cut_ranges:
-            return ""
-        
-        # 按开始时间排序
-        cut_ranges.sort(key=lambda x: x[0])
-        
-        # 合并重叠的切割段
-        merged = []
-        for start, end in cut_ranges:
-            if merged and start <= merged[-1][1]:
-                merged[-1] = (merged[-1][0], max(merged[-1][1], end))
-            else:
-                merged.append((start, end))
-        
-        # 计算反向保留段
-        keep_segments = []
-        cursor = 0
-        
-        for cut_start, cut_end in merged:
-            if cursor < cut_start:
-                keep_segments.append((cursor, cut_start))
-            cursor = max(cursor, cut_end)
-        
-        # 最后一段：最后一个切割结束到视频结尾
-        if cursor < duration_ms:
-            keep_segments.append((cursor, duration_ms))
-        
-        if not keep_segments:
-            return ""  # 整个视频都被切掉了
-        
-        # 格式化保留段
-        parts = []
-        for start_ms, end_ms in keep_segments:
-            parts.append(f"{self.format_time(start_ms)}-{self.format_time(end_ms)}")
-        
-        return ",".join(parts)
     
     def load_cut_times(self, cut_times):
         # 解析并加载之前的切割设置

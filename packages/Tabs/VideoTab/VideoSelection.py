@@ -67,7 +67,8 @@ class VideoSelectionSetting(QWidget):
                 folders.append(path)
         
         if non_video_files and not video_files and not folders:
-            QMessageBox.warning(self, "提示", "支持的视频格式：\n.mkv .mp4 .avi .mov .wmv .flv .webm .m2ts .ts")
+            supported = " ".join(VIDEO_EXTENSIONS)
+            QMessageBox.warning(self, "提示", f"支持的视频格式：\n{supported}")
             event.ignore()
             return
         
@@ -490,6 +491,7 @@ class VideoSelectionSetting(QWidget):
     
     def load_track_info_threaded(self):
         """使用 BackgroundRunner 在后台线程中加载视频轨道信息"""
+        GlobalSetting.VIDEO_TRACK_INFO_READY = False
         self._track_info_gen += 1
         
         file_paths = GlobalSetting.VIDEO_FILES_ABSOLUTE_PATH_LIST.copy()
@@ -532,6 +534,7 @@ class VideoSelectionSetting(QWidget):
             GlobalSetting.VIDEO_OLD_TRACKS_SUBTITLES_INFO = temp_subtitles
             GlobalSetting.VIDEO_OLD_TRACKS_AUDIOS_INFO = temp_audios
             GlobalSetting.VIDEO_OLD_ATTACHMENTS_INFO = temp_attachments
+            GlobalSetting.VIDEO_TRACK_INFO_READY = True
             
             if not hasattr(GlobalSetting, 'VIDEO_TITLES'):
                 GlobalSetting.VIDEO_TITLES = [None] * total_files

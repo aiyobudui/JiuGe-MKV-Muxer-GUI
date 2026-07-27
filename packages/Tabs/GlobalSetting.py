@@ -28,6 +28,8 @@ class GlobalSetting(QWidget):
     VIDEO_OLD_TRACKS_AUDIOS_INFO: List[List[dict]] = []
     VIDEO_OLD_ATTACHMENTS_INFO: List[List[dict]] = []
     VIDEO_SELECTED_INDICES: List[int] = []
+    # 轨道信息是否已完成后台解析（start_muxing 开始混流前用于守卫，避免轨道选择/默认轨/语言被静默丢弃）
+    VIDEO_TRACK_INFO_READY = False
     
     SUBTITLE_FILES_LIST = defaultdict(list)
     SUBTITLE_FILES_ABSOLUTE_PATH_LIST = defaultdict(list)
