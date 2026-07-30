@@ -554,43 +554,65 @@ class VideoSelectionSetting(QWidget):
     @staticmethod
     def _get_track_info_worker(file_path, task_id):
         """获取单个视频的全部轨道信息（BackgroundRunner worker 签名）。
-        
+
         Returns:
             dict: 包含 subtitle_tracks, audio_tracks, video_tracks, attachment_tracks, title
+
+        轨道字典为「加工格式」：language/name/is_default/is_forced/codec 等均为
+        顶层键（从 mkvmerge -J 的 properties 中提取），与 TrackInfo.get_*_tracks
+        以及下游 TrackSelectionDialog / build_mkvmerge_args 的取值方式一致。
+
+        重要修复：mkvmerge -J 的字幕轨道 type 是 "subtitles"（复数），此前误写成
+        "subtitle"（单数）导致字幕轨道永远匹配不到、列表恒为空。
         """
         from packages.Utils.TrackInfo import get_video_tracks_info
-        
+
         try:
             info = get_video_tracks_info(file_path)
         except Exception as e:
             logging.warning(f"get_video_tracks_info 异常 ({file_path}): {e}")
             return {'subtitle_tracks': [], 'audio_tracks': [], 'video_tracks': [],
                     'attachment_tracks': [], 'title': ''}
-        
+
         subtitle_tracks = []
         audio_tracks = []
         video_tracks = []
         attachment_tracks = []
         title = ""
-        
+
         if info:
-            tracks = info.get('tracks', [])
-            for track in tracks:
-                track_type = track.get('type', '')
-                if track_type == 'subtitle':
-                    subtitle_tracks.append(track)
-                elif track_type == 'audio':
-                    audio_tracks.append(track)
-                elif track_type == 'video':
-                    video_tracks.append(track)
-            
+            for track in info.get('tracks', []):
+                ttype = track.get('type', '')
+                props = track.get('properties', {})
+                rec = {
+                    'id': track.get('id', 0),
+                    'language': props.get('language', 'und'),
+                    'name': props.get('track_name', ''),
+                    'is_default': props.get('default_track', False),
+                    'is_forced': props.get('forced_track', False),
+                    'codec': track.get('codec', ''),
+                }
+                if ttype == 'subtitles':
+                    subtitle_tracks.append(rec)
+                elif ttype == 'audio':
+                    rec['channels'] = props.get('audio_channels', 0)
+                    rec['sample_rate'] = props.get('audio_sampling_rate', 0)
+                    audio_tracks.append(rec)
+                elif ttype == 'video':
+                    rec['width'] = props.get('video_pixel_width', 0)
+                    rec['height'] = props.get('video_pixel_height', 0)
+                    video_tracks.append(rec)
+
             attachment_tracks = info.get('attachments', [])
-            
+
             if info.get('title'):
                 title = info['title']
             elif 'properties' in info and info['properties'].get('title'):
                 title = info['properties']['title']
-        
+            elif 'container' in info and 'properties' in info['container'] \
+                    and info['container']['properties'].get('title'):
+                title = info['container']['properties']['title']
+
         return {
             'subtitle_tracks': subtitle_tracks,
             'audio_tracks': audio_tracks,
