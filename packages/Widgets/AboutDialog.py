@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QSizePolicy
 )

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import winreg
-from PySide6.QtCore import Qt, QTimer, QUrl
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QDropEvent
 from PySide6.QtWidgets import QFrame, QVBoxLayout, QMessageBox, QFileDialog, QDialog
 

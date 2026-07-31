@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
 import os
-import re
 import logging
-import subprocess
-from PySide6.QtCore import Signal, Qt, QMimeData, QUrl
+from PySide6.QtCore import Signal, Qt
 from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QTableWidget, QTableWidgetItem,
     QHeaderView, QFileDialog, QMessageBox, QGroupBox, QCheckBox
 )
@@ -15,7 +13,6 @@ from packages.Startup import GlobalIcons
 from packages.Startup.Options import Options
 from packages.Tabs.GlobalSetting import GlobalSetting, get_readable_filesize
 from packages.Startup.PreDefined import VIDEO_EXTENSIONS
-from packages.Utils.TrackInfo import get_subtitle_tracks, get_audio_tracks, get_attachments, get_video_tracks
 from packages.Widgets.ExtractTracksDialog import ExtractTracksDialog
 
 

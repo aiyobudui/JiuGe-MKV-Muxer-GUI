@@ -9,8 +9,6 @@ from PySide6.QtWidgets import (
     QCheckBox
 )
 
-from packages.Startup import GlobalIcons
-from packages.Startup.Options import Options
 from packages.Tabs.GlobalSetting import GlobalSetting
 from packages.Startup.PreDefined import ATTACHMENT_EXTENSIONS
 from packages.Widgets.FloatingReorderButtons import FloatingReorderButtons

@@ -1,10 +1,7 @@
 # -*- coding: utf-8 -*-
-import os
-import re
 from collections import defaultdict
 from typing import List
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget
 
 

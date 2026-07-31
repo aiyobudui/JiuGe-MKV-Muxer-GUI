@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QTabWidget, QPushButton, QHBoxLayout, QWidget
+from PySide6.QtWidgets import QTabWidget, QPushButton
 
 from packages.Tabs.VideoTab.VideoSelection import VideoSelectionSetting
 from packages.Tabs.SubtitleTab.SubtitleSelection import SubtitleSelectionSetting
@@ -8,8 +8,6 @@ from packages.Tabs.AudioTab.AudioSelection import AudioSelectionSetting
 from packages.Tabs.AttachmentTab.AttachmentSelection import AttachmentSelectionSetting
 from packages.Tabs.MuxSetting.MuxSetting import MuxSettingTab
 from packages.Widgets.AboutDialog import AboutDialog
-
-from packages.Tabs.GlobalSetting import GlobalSetting
 
 
 class TabsManager(QTabWidget):

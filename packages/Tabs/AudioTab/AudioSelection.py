@@ -8,8 +8,6 @@ from PySide6.QtWidgets import (
     QHeaderView, QFileDialog, QGroupBox, QMessageBox
 )
 
-from packages.Startup import GlobalIcons
-from packages.Startup.Options import Options
 from packages.Tabs.GlobalSetting import GlobalSetting
 from packages.Startup.PreDefined import AUDIO_EXTENSIONS
 from packages.Widgets.FloatingReorderButtons import FloatingReorderButtons

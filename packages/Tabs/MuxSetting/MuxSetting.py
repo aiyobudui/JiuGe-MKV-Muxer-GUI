@@ -7,8 +7,7 @@ import threading
 import logging
 import time
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from PySide6.QtCore import Signal, Qt, QUrl, QEvent, QSize
+from PySide6.QtCore import Signal, Qt, QUrl, QEvent
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
 from PySide6.QtWidgets import (
@@ -18,7 +17,6 @@ from PySide6.QtWidgets import (
     QProgressBar, QMessageBox, QDialog, QTextEdit, QSlider, QSplitter, QListWidget
 )
 
-from packages.Startup import GlobalIcons
 from packages.Startup.Options import Options
 from packages.Tabs.GlobalSetting import GlobalSetting, get_readable_filesize
 from packages.Tabs.MuxSetting.TrackSelectionDialog import TrackSelectionDialog
