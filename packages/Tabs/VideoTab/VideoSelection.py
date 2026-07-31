@@ -210,11 +210,13 @@ class VideoSelectionSetting(QWidget):
             size_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.video_table.setItem(row, 6, size_item)
         
+        # 更新选中索引，因为复选框默认是选中状态。
+        # 必须放在轨道信息后台加载之前：若 load_track_info_threaded 同步抛异常，
+        # 可避免 VIDEO_SELECTED_INDICES 停留在旧值（例如之前只加载过 1 个文件）。
+        self.update_selected_indices()
+        
         if has_mkvmerge:
             self.load_track_info_threaded()
-        
-        # 更新选中索引，因为复选框默认是选中状态
-        self.update_selected_indices()
         
         self.video_list_updated.emit()
     
@@ -481,10 +483,13 @@ class VideoSelectionSetting(QWidget):
             size_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.video_table.setItem(row, 6, size_item)
         
+        # 更新选中索引，因为复选框默认是选中状态。
+        # 必须放在轨道信息后台加载之前：若 load_track_info_threaded 同步抛异常，
+        # 可避免 VIDEO_SELECTED_INDICES 停留在旧值（例如之前只加载过 1 个文件）。
+        self.update_selected_indices()
+
         if has_mkvmerge:
             self.load_track_info_threaded()
-        
-        self.update_selected_indices()
     
     def load_track_info_threaded(self):
         """使用 BackgroundRunner 在后台线程中加载视频轨道信息"""

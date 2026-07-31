@@ -44,6 +44,8 @@ class TabsManager(QTabWidget):
         self.addTab(self.audio_tab, "音轨")
         self.addTab(self.attachment_tab, "附件")
         self.addTab(self.mux_setting_tab, "开始混流")
+        # 接线：让混流选项卡在「添加到队列」前能重新计算真实勾选状态
+        self.mux_setting_tab.video_selection = self.video_tab
     
     def setup_corner_button(self):
         about_btn = QPushButton("关于")
