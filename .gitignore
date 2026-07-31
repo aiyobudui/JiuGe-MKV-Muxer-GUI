@@ -74,6 +74,10 @@ Thumbs.db
 *.exe
 *.dll
 
+# 图标源文件（仅保留 App.ico 入库，PNG/SVG 为可重新生成的源，不入库）
+Resources/Icons/App.png
+Resources/Icons/App.svg
+
 # WorkBuddy 本地工作记忆（含本地路径与隐私，不应入库）
 .workbuddy/
 

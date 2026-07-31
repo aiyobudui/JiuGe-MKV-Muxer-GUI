@@ -101,7 +101,7 @@ echo     完成！
 :: 步骤 8/9 构建 EXE（--noconfirm 不卡覆盖确认；--noupx 避免被杀软拦截）
 echo.
 echo [步骤 8/9] 开始构建可执行文件（EXE）...
-%PY% -m PyInstaller --noconfirm --noupx --name "JiuGe MKV Muxer GUI" --windowed --icon "Resources/Icons/App.ico" --add-data "Resources/Icons/App.png;." --collect-submodules packages --hidden-import packages.Styles --hidden-import packages.Widgets.CustomCheckBox main.py
+%PY% -m PyInstaller --noconfirm --noupx --name "JiuGe MKV Muxer GUI" --windowed --icon "Resources/Icons/App.ico" --add-data "Resources/Icons/App.ico;Resources/Icons" --collect-submodules packages --hidden-import packages.Styles --hidden-import packages.Widgets.CustomCheckBox main.py
 if not !errorlevel!==0 (
     echo [错误] 构建失败，请查看上方日志。
     pause
