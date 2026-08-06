@@ -3,7 +3,7 @@ import os
 import winreg
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QDropEvent
-from PySide6.QtWidgets import QFrame, QVBoxLayout, QMessageBox, QFileDialog, QDialog
+from PySide6.QtWidgets import QFrame, QVBoxLayout, QMessageBox, QDialog
 
 from packages.Startup import GlobalIcons
 from packages.Startup.Options import Options
@@ -102,37 +102,14 @@ class MainWindow(MyMainWindow):
     def check_mkvmuxing_path(self):
         if Options.Mkvmerge_Path and os.path.exists(Options.Mkvmerge_Path):
             return
-        
+
         dialog = MktoolnixNotFoundDialog(self)
         result = dialog.exec()
-        
-        if result == QDialog.Accepted:
-            self.select_mkvtoolnix_dir()
-    
-    def select_mkvtoolnix_dir(self):
-        folder = QFileDialog.getExistingDirectory(
-            self,
-            "选择 MKVToolNix 安装目录",
-            ""
-        )
-        
-        if folder:
-            mkvmerge_path = self.find_mkvmerge_in_dir(folder)
-            if mkvmerge_path:
-                Options.Mkvmerge_Path = mkvmerge_path
-                Options.save()
-                QMessageBox.information(self, "成功", f"已找到 mkvmerge.exe：\n{mkvmerge_path}")
-                self.tabs.video_tab.refresh_track_info_now()
-                return True
-            else:
-                QMessageBox.warning(self, "错误", f"在所选目录中未找到 mkvmerge.exe：\n{folder}")
-        return False
-    
-    def find_mkvmerge_in_dir(self, folder):
-        mkvmerge_path = os.path.join(folder, "mkvmerge.exe")
-        if os.path.exists(mkvmerge_path):
-            return mkvmerge_path
-        return None
+
+        if result == QDialog.Accepted and dialog.get_selected_path():
+            Options.Mkvmerge_Path = dialog.get_selected_path()
+            Options.save()
+            self.tabs.video_tab.refresh_track_info_now()
     
     def connect_signals(self):
         self.tabs.currentChanged.connect(self.update_minimum_size)
