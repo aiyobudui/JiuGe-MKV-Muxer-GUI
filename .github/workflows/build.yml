@@ -1,0 +1,74 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (Windows)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pyinstaller pillow
+
+      - name: Generate icon
+        run: |
+          if (Test-Path "Resources/Icons/App.ico") {
+            Write-Host "Icon exists, skipping generation."
+          } elseif (Test-Path "Resources/Icons/App.png") {
+            python -c "from PIL import Image; img=Image.open('Resources/Icons/App.png'); sizes=[(16,16),(24,24),(32,32),(48,48),(64,64),(96,96),(128,128),(256,256)]; img.save('Resources/Icons/App.ico', format='ICO', sizes=sizes)"
+          }
+
+      - name: Clean PyInstaller cache
+        run: |
+          if (Test-Path "$env:LOCALAPPDATA\pyinstaller") {
+            Remove-Item -Recurse -Force "$env:LOCALAPPDATA\pyinstaller"
+          }
+
+      - name: Build EXE
+        run: |
+          python -m PyInstaller --noconfirm --noupx --name "JiuGe MKV Muxer GUI" --windowed --icon "Resources/Icons/App.ico" --add-data "Resources/Icons/App.ico;Resources/Icons" --collect-submodules packages --hidden-import packages.Styles --hidden-import packages.Widgets.CustomCheckBox main.py
+
+      - name: Package artifact
+        run: |
+          $version = ${{ github.ref_name }}
+          $tagged = $version -replace '^v',''
+          $zipName = "JiuGe_MKV_Muxer_GUI_v$tagged"
+          Compress-Archive -Path "dist\JiuGe MKV Muxer GUI\*" -DestinationPath "dist\$zipName.zip"
+          echo "ZIP: dist\$zipName.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.ref_name }}
+          path: dist/*.zip
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+
+      - name: Clean build artifacts
+        run: |
+          if (Test-Path build) { Remove-Item -Recurse -Force build }
+          if (Test-Path "JiuGe MKV Muxer GUI.spec") { Remove-Item -Force "JiuGe MKV Muxer GUI.spec" }
